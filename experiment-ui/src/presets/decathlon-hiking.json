@@ -1,0 +1,145 @@
+{
+  "id": "decathlon-hiking-v2",
+  "form": {
+    "persona": {
+      "numSubjects": 20,
+      "generalIntent": "You are planning a one-day hiking trip and need to purchase a suitable hiking backpack from Decathlon. Find a backpack with a capacity of approximately 20 to 25 liters and a budget of no more than 60,000 KRW. Browse the website naturally, examine product information, and compare at least two suitable options based on price, comfort, functionality, and customer reviews. Choose the product that best fits your personal preferences and add it to your shopping cart. You do not need to complete the payment. If a suitable product cannot be found or a website issue prevents you from continuing, stop and report the reason.",
+      "examplePersona": "Persona: Jiyoon Kim Background: Jiyoon is a 29-year-old office worker living in Daegu, South Korea. She enjoys light outdoor activities and recently became interested in weekend hiking. She plans short hiking trips to nearby mountains to relax and maintain her physical health. She is not an experienced hiker and prefers practical, beginner-friendly outdoor equipment. Demographics: Age: 29 Gender: Female Location: Daegu, South Korea Education: Bachelor's Degree Occupation: Office Worker Monthly Income: 3,000,000 KRW Online Shopping Frequency: 1-3 times per month Hiking Experience: Beginner Purchase Priority: Comfort and practicality Digital Proficiency: Moderate Budget Sensitivity: High Financial Situation: Jiyoon has a stable income but carefully manages her monthly expenses. She prefers affordable products that provide good value for money. She is willing to pay slightly more for better comfort and durability but avoids unnecessary premium features. Shopping Habits: Jiyoon regularly shops online for clothing, household goods, and recreational equipment. She usually begins shopping by searching for relevant product keywords. She compares multiple products before making a decision and pays attention to prices, customer reviews, product descriptions, and availability. She sometimes uses category filters to narrow down search results. Outdoor Activity Preferences: Jiyoon enjoys casual hiking rather than professional mountaineering. She typically goes on hikes lasting three to five hours. She wants a lightweight backpack with enough space for water, snacks, an extra jacket, and personal belongings. She values comfortable shoulder straps, practical compartments, and ease of use. Technology Experience: Jiyoon is familiar with general e-commerce websites and uses both a smartphone and laptop for shopping. She can use search functions and simple filters but may struggle with unfamiliar navigation structures, unclear product categories, or complicated interfaces. Decision-Making Style: Jiyoon is a cautious and practical shopper. She prefers evaluating several alternatives before choosing a product. Customer reviews influence her decisions, especially when they describe real-world comfort or durability. If product information is missing or confusing, she may spend additional time searching or reconsider her choice. Personal Style: Jiyoon prefers simple and functional designs. She likes neutral colors such as black, gray, and navy. She values convenience, comfort, and practicality more than brand reputation or fashionable appearance.",
+      "useExamplePersona": true,
+      "demographics": [
+        {
+          "name": "Age",
+          "choices": [
+            {
+              "name": "25-34",
+              "weight": 45.0
+            },
+            {
+              "name": "18-24",
+              "weight": 27.0
+            },
+            {
+              "name": "34-44",
+              "weight": 18.0
+            },
+            {
+              "name": "45-55",
+              "weight": 9.0
+            }
+          ]
+        },
+        {
+          "name": "Gender",
+          "choices": [
+            {
+              "name": "Male",
+              "weight": 50
+            },
+            {
+              "name": "Female",
+              "weight": 50
+            }
+          ]
+        },
+        {
+          "name": "Online Shopping Frequency",
+          "choices": [
+            {
+              "name": "Once a week or more",
+              "weight": 56
+            },
+            {
+              "name": "1-3 times per month",
+              "weight": 33
+            },
+            {
+              "name": "A few times per year",
+              "weight": 11
+            }
+          ]
+        },
+        {
+          "name": "Hiking Experience",
+          "choices": [
+            {
+              "name": "Beginner",
+              "weight": 50
+            },
+            {
+              "name": "Experienced",
+              "weight": 33
+            },
+            {
+              "name": "Intermediate",
+              "weight": 17
+            }
+          ]
+        },
+        {
+          "name": "Purchase Priority",
+          "choices": [
+            {
+              "name": "Lowest Price",
+              "weight": 36
+            },
+            {
+              "name": "Customer Reviews",
+              "weight": 29
+            },
+            {
+              "name": "Comfort and Practicality",
+              "weight": 21
+            },
+            {
+              "name": "Durability and Quality",
+              "weight": 14
+            }
+          ]
+        },
+        {
+          "name": "Digital Proficiency",
+          "choices": [
+            {
+              "name": "High",
+              "weight": 50
+            },
+            {
+              "name": "Moderate",
+              "weight": 42
+            },
+            {
+              "name": "Low",
+              "weight": 8
+            }
+          ]
+        },
+        {
+          "name": "Budget Sensitivity",
+          "choices": [
+            {
+              "name": "High",
+              "weight": 60
+            },
+            {
+              "name": "Medium",
+              "weight": 30
+            },
+            {
+              "name": "Low",
+              "weight": 10
+            }
+          ]
+        }
+      ]
+    },
+    "experiment": {
+      "startUrl": "https://www.decathlon.co.kr/",
+      "headless": true,
+      "maxSteps": 50,
+      "concurrency": 1
+    },
+    "survey": {
+      "questionnaire": "{\n  \"questionnaire_id\": \"decathlon_hiking_backpack_v1\",\n  \"title\": \"Decathlon Hiking Backpack Shopping Experience\",\n  \"questions\": [\n    {\n      \"id\": \"q1\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I think that I would like to use this system frequently. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q2\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I found the system unnecessarily complex. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q3\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I thought the system was easy to use. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q4\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I think that I would need the support of a technical person to be able to use this system. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q5\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I found the various functions in this system were well integrated. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q6\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I thought there was too much inconsistency in this system. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q7\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I would imagine that most people would learn to use this system very quickly. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q8\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I found the system very cumbersome to use. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q9\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I felt very confident using the system. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q10\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"I needed to learn a lot of things before I could get going with this system. (1 = Strongly Disagree, 5 = Strongly Agree)\",\n      \"options\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"id\": \"q11\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"What was the final outcome of your hiking backpack shopping task?\",\n      \"options\": [\n        \"Successfully added a suitable backpack to the cart\",\n        \"Found a suitable backpack but could not add it to the cart\",\n        \"Browsed backpacks but did not select one\",\n        \"Could not find a suitable backpack\",\n        \"Could not navigate the website successfully\",\n        \"Not sure\"\n      ]\n    },\n    {\n      \"id\": \"q12\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"Which method did you primarily use to find hiking backpacks on the website?\",\n      \"options\": [\n        \"Search bar\",\n        \"Category navigation\",\n        \"Product filters or sorting\",\n        \"Homepage links or recommendations\",\n        \"Could not locate hiking backpacks\",\n        \"Not sure\"\n      ]\n    },\n    {\n      \"id\": \"q13\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"How easy was it to compare at least two backpacks based on their prices, features, and customer reviews?\",\n      \"options\": [\n        \"Very easy\",\n        \"Somewhat easy\",\n        \"Neither easy nor difficult\",\n        \"Somewhat difficult\",\n        \"Unable to assess\",\n        \"Very difficult\"\n      ]\n    },\n    {\n      \"id\": \"q14\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"How easy was it to find backpacks that matched the required capacity of 20 to 25 liters and budget under 60,000 KRW?\",\n      \"options\": [\n        \"Very easy\",\n        \"Somewhat easy\",\n        \"Neither easy nor difficult\",\n        \"Somewhat difficult\",\n        \"Very difficult\",\n        \"Unable to assess\"\n      ]\n    },\n    {\n      \"id\": \"q15\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"Was the available product information sufficient for you to make a confident purchasing decision?\",\n      \"options\": [\n        \"Yes, completely sufficient\",\n        \"Mostly sufficient\",\n        \"Partially sufficient\",\n        \"Not sufficient\",\n        \"Unable to assess\"\n      ]\n    },\n    {\n      \"id\": \"q16\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"Which part of the shopping process was the most difficult?\",\n      \"options\": [\n        \"Finding the relevant product category\",\n        \"Using search, filters, or sorting\",\n        \"Understanding product specifications\",\n        \"Comparing different products\",\n        \"Adding a product to the cart\",\n        \"No significant difficulties\",\n        \"Other\"\n      ]\n    },\n    {\n      \"id\": \"q17\",\n      \"type\": \"multiple_choice\",\n      \"prompt\": \"Which factor had the greatest influence on your final product preference?\",\n      \"options\": [\n        \"Price\",\n        \"Backpack capacity\",\n        \"Comfort and functional features\",\n        \"Customer reviews\",\n        \"Durability and quality\",\n        \"Appearance and design\",\n        \"No product preference was formed\",\n        \"Other\"\n      ]\n    },\n    {\n      \"id\": \"q18\",\n      \"type\": \"short_text\",\n      \"prompt\": \"Describe the most confusing or frustrating moment during your shopping experience. What happened, and how did it affect your progress? If there was none, answer 'None'.\"\n    },\n    {\n      \"id\": \"q19\",\n      \"type\": \"short_text\",\n      \"prompt\": \"What specific improvement to the Decathlon website would have made your backpack shopping experience easier or more efficient? If no improvement is needed, answer 'None'.\"\n    }\n  ]\n}"
+    }
+  }
+}
