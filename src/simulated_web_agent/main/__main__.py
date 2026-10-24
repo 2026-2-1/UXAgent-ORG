@@ -90,7 +90,7 @@ def main(
     cfg = _load_cfg()
     cfg.environment.recording.enabled = record
     cfg.environment.browser.launch_options.headless = headless
-    gpt.provider = cfg.llm_provider
+    gpt.configure(cfg)
     # config.browser.user_data_dir
     if not use_user_data_dir:
         cfg.environment.browser.user_data_dir = None

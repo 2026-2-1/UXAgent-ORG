@@ -132,6 +132,7 @@ wandb
 
 *.parquet
 runs/
+browser_cache/
 new_upload
 output
 new_output

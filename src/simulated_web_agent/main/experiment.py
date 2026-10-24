@@ -57,7 +57,7 @@ async def _run_for_persona_and_intent(
     )
     # save persona and intent
     (base_dir / "runs" / run_name / "basic_info.json").write_text(
-        json.dumps(persona_info)
+        json.dumps(persona_info), encoding="utf-8"
     )
     context.run_path.set(trace_dir)
     steps_taken = 0
@@ -76,7 +76,7 @@ async def _run_for_persona_and_intent(
         )
         # get scroll top position
         scroll_top = await env.page.evaluate("window.scrollY")
-        with open(trace_dir / "screenshot" / f"scroll_top_{steps_taken}.txt", "w") as f:
+        with open(trace_dir / "screenshot" / f"scroll_top_{steps_taken}.txt", "w", encoding="utf-8") as f:
             f.write(
                 str(
                     scroll_top
@@ -115,6 +115,7 @@ async def _run_for_persona_and_intent(
         await page.close()
 
     log.info(f"[{run_uid}] env created")
+    policy = None
     try:
         policy = AgentPolicy(persona, intent)
         print("setting up env with headless = " + str(cfg.environment.browser.launch_options.headless))
@@ -134,34 +135,35 @@ async def _run_for_persona_and_intent(
 
         action_trace = []
         while steps_taken < max_steps:
-            with open(trace_dir / "observation_trace.jsonl", "a") as f:
+            with open(trace_dir / "observation_trace.jsonl", "a", encoding="utf-8") as f:
                 json.dump(obs, f)
             if obs.get("tabs"):
                 current_url = obs["tabs"][0].get("url")
                 print("Current url:", current_url)
             with open(
-                trace_dir / "simp_html" / f"simp_html_{steps_taken}.html", "w"
+                trace_dir / "simp_html" / f"simp_html_{steps_taken}.html", "w", encoding="utf-8"
             ) as f:
                 f.write(obs["html"])
             with open(
-                trace_dir / "raw_html" / f"raw_html_{steps_taken}.html", "w"
+                trace_dir / "raw_html" / f"raw_html_{steps_taken}.html", "w", encoding="utf-8"
             ) as f:
                 f.write(await env.page.content())
 
             # Use our policy to determine the action for this step from the environment
             action = await policy.forward(env)
             action_trace.append(action)
-            with open(trace_dir / "action_trace.json", "w") as f:
+            with open(trace_dir / "action_trace.json", "w", encoding="utf-8") as f:
                 json.dump(action_trace, f, indent=2)
             with open(
                 trace_dir
                 / "observation_trace"
                 / f"observation_trace_{steps_taken}.txt",
                 "w",
+                encoding="utf-8",
             ) as f:
                 f.write(policy.agent.observation)
             # save memory trace
-            with open(trace_dir / "memory_trace.json", "w") as f:
+            with open(trace_dir / "memory_trace.json", "w", encoding="utf-8") as f:
                 json.dump(policy.agent.memory.memories, f)
             print(f"Taking action {action}")
             print(f"Action: {steps_taken + 1} out of {max_steps}")
@@ -188,10 +190,16 @@ async def _run_for_persona_and_intent(
         err = traceback.format_exc()
         print(err)
         try:
-            (policy.run_path / "error.txt").write_text(err)  # type: ignore[attr-defined]
+            (trace_dir / "error.txt").write_text(err, encoding="utf-8")
         except Exception:
             pass
     finally:
+        if policy is not None:
+            try:
+                await policy.close()
+            except Exception:
+                log.exception(f"[{run_uid}] agent background task failed during shutdown")
+                (trace_dir / "error.txt").write_text(traceback.format_exc(), encoding="utf-8")
         try:
             log.info(f"[{run_uid}] closing env...")
             await asyncio.wait_for(asyncio.shield(env.close()), timeout=10)
@@ -221,7 +229,7 @@ async def experiment_async(
     cfg = _load_cfg(config_name=config_name)
     if concurrency:
         cfg.environment.browser.user_data_dir = None
-    gpt.provider = cfg.llm_provider
+    gpt.configure(cfg)
     print("llm provider: " + cfg.llm_provider)
 
     sem = asyncio.Semaphore(concurrency)

@@ -92,7 +92,13 @@ survey:
 # LLM CONFIGURATION
 # ============================================================================
 # Large Language Model provider settings
-llm_provider: "aws"     # Provider: "openai" or "aws" or "anthropic"
+llm_provider: ${oc.env:LLM_PROVIDER,local}  # local, openai, aws, anthropic
+# Local chat uses LOCAL_LLM_BASE_URL (default http://127.0.0.1:8000),
+# LOCAL_LLM_MODEL (default persona-qwen), and optional LOCAL_LLM_API_KEY.
+# Embeddings are independent of chat; no automatic fallback to a paid provider.
+# local uses LOCAL_EMBEDDING_BASE_URL (http://127.0.0.1:8100/v1),
+# LOCAL_EMBEDDING_MODEL (persona-qwen-embedding), optional LOCAL_EMBEDDING_API_KEY.
+embedding_provider: ${oc.env:EMBEDDING_PROVIDER,local}  # local, openai, aws; null disables
 
 # ============================================================================
 # GENERAL SETTINGS

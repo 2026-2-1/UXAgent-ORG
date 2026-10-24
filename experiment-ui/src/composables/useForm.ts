@@ -1,93 +1,36 @@
 // src/composables/useForm.ts
 import { reactive, watch } from 'vue'
 import type { WizardForm } from '../types'
+import decathlonHikingPreset from '../presets/decathlon-hiking.json'
 
+// Defaults are portable; browser drafts are restored after the one-time preset update.
 export function getWizardDefaults(): WizardForm {
-  return {
-    persona: {
-      numSubjects: 20,
-      generalIntent: 'Buy a jacket',
-      examplePersona: `Persona: Clara
-Background:
-Clara is a PhD student in Computer Science at a prestigious university. She is deeply engaged in research focusing on artificial intelligence and machine learning, aiming to contribute to advancements in technology that can benefit society.
-
-Demographics:
-
-Age: 28
-Gender: Female
-Education: Pursuing a PhD in Computer Science
-Profession: PhD student
-Income: $50,000
-
-Financial Situation:
-Clara lives on her stipend as a PhD student and is careful with her spending. She prefers to save money for research-related expenses and invest in her academic pursuits.
-
-Shopping Habits:
-Clara dislikes shopping and avoids spending much time browsing through products. She prefers straightforward, efficient shopping experiences and often shops online for convenience. When she does shop, she looks for practicality and affordability over style or trendiness.
-So Clara wants to shop QUICKLY and EFFICIENTLY.
-
-Professional Life:
-Clara spends most of her time in academia, attending conferences, working in the lab, and writing papers. Her commitment to her research is her main priority, and she manages her time around her academic responsibilities.
-
-Personal Style:
-Clara prefers comfortable, functional clothing, often choosing items that are easy to wear for long hours spent at her desk or in the lab. She wears medium-sized clothing and likes colors that reflect her personality—mostly red, which she finds uplifting and energizing.`,
-      demographics: [
-        {
-          name: 'Age',
-          choices: [
-            { name: '18-55', weight: 1 },
-          ]
-        },
-        {
-          name: 'Gender',
-          choices: [
-            { name: 'Male', weight: 1 },
-            { name: 'Female', weight: 1 },
-            { name: 'Non-binary', weight: 1 },
-          ]
-        },
-        {
-          name: "Online Shopping Frequency",
-          choices: [
-            { name: 'A few times per year', weight: 1 },
-            { name: 'option 2', weight: 1 },
-            { name: 'option 3', weight: 1 },
-          ]
-        },
-      ]
-    },
-    experiment: {
-      startUrl: '',
-      headless: true,
-      maxSteps: 50,
-      concurrency: 1, 
-    },
-    survey: {
-      questionnaire: ''
-    }
-  }
+  return structuredClone(decathlonHikingPreset.form)
 }
 
 export function createWizardForm() {
   const STORAGE_KEY = 'wizard_form'
+  let saved: (Partial<WizardForm> & { _preset?: string }) | null = null
+  try {
+    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
+    if (value && typeof value === 'object' && !Array.isArray(value)) saved = value
+  } catch { /* Unavailable storage or an invalid draft: use the preset. */ }
 
   const defaults = getWizardDefaults()
+  const form = reactive<WizardForm>(defaults)
 
-  let saved: any = null
-  try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') } catch { saved = null }
-
-  const form = reactive<WizardForm>({ ...defaults })
-  if (saved && typeof saved === 'object') {
-    try {
-      if (saved.persona && typeof saved.persona === 'object') Object.assign(form.persona!, saved.persona)
-      if (saved.experiment && typeof saved.experiment === 'object') Object.assign(form.experiment, saved.experiment)
-      if (saved.survey && typeof saved.survey === 'object') Object.assign(form.survey, saved.survey)
-    } catch {}
+  // Migrate older drafts to this study once. Subsequent visits retain edits.
+  if (saved?._preset === decathlonHikingPreset.id) {
+    if (saved.persona && typeof saved.persona === 'object') Object.assign(form.persona, saved.persona)
+    if (saved.experiment && typeof saved.experiment === 'object') Object.assign(form.experiment, saved.experiment)
+    if (saved.survey && typeof saved.survey === 'object') Object.assign(form.survey, saved.survey)
   }
 
-  watch(form, (val) => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(val)) } catch {}
-  }, { deep: true })
+  watch(form, (value) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...value, _preset: decathlonHikingPreset.id }))
+    } catch { /* The form still works when browser storage is unavailable. */ }
+  }, { deep: true, immediate: true })
 
   return form
 }

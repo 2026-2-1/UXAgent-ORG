@@ -7,6 +7,7 @@ export type PersonaConfig = {
   numSubjects: number; // >= 1
   generalIntent: string; // non-empty
   examplePersona: string;
+  useExamplePersona?: boolean;
   // Unified demographics schema
   demographics: {
     name: string;

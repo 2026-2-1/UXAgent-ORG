@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import datetime
 import json
 import logging
@@ -208,8 +209,11 @@ class AgentPolicy(BasePolicy):
 
     async def close(self):
         if self.slow_loop_task is not None:
-            self.slow_loop_task.cancel()
+            task = self.slow_loop_task
             self.slow_loop_task = None
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
     # def forward(self, observation, available_actions):
     #     return asyncio.run(self._forward(observation, available_actions))

@@ -43,13 +43,13 @@ const emit = defineEmits<{ (e:'done'):void; (e:'height', h:number):void }>()
 async function onEnter() {
   // Wait until DOM update, then one frame for styles/layout to apply
   await nextTick()
-  requestAnimationFrame(measureAndEmit)
+  requestAnimationFrame(reportHeight)
 }
 
 async function onAfterEnter() {
   // One more pass in case height changes after progress bar mounts
   await nextTick()
-  requestAnimationFrame(measureAndEmit)
+  requestAnimationFrame(reportHeight)
 }
 
 const reportHeight = () => {
@@ -59,17 +59,17 @@ const reportHeight = () => {
 onMounted(reportHeight)
 onUpdated(reportHeight)
 
+const { data, error, start, stop } = useProgress(1000)
+
 watch(() => props.active, async (on) => {
   if (on) {
     await nextTick()
-    requestAnimationFrame(measureAndEmit)
+    requestAnimationFrame(reportHeight)
     start()
   } else {
     stop()
   }
 }, { immediate: true })
-
-const { data, error, start, stop } = useProgress(1000)
 
 const isIdle = computed(() => (data.value as any).status === 'idle')
 const snap = computed(() => data.value as any)
@@ -82,11 +82,6 @@ const percent = computed(() => {
 const ariaText = computed(() =>
   isIdle.value ? (snap.value.message || 'Waiting…') : `${snap.value.label}: ${snap.value.current} of ${snap.value.total}`
 )
-
-watch(() => props.active, (on) => {
-  if (on) start()
-  else stop()
-}, { immediate: true })
 
 // auto-hide shortly after 100%
 let hideTimer: number | null = null

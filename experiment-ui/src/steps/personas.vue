@@ -270,6 +270,7 @@ function handleReset() {
   form.persona!.numSubjects = defaults.persona.numSubjects;
   form.persona!.generalIntent = defaults.persona.generalIntent;
   form.persona!.examplePersona = defaults.persona.examplePersona;
+  form.persona!.useExamplePersona = defaults.persona.useExamplePersona;
   form.persona!.demographics = JSON.parse(
     JSON.stringify(defaults.persona.demographics)
   );

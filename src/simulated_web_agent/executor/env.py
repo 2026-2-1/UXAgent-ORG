@@ -525,7 +525,7 @@ class WebAgentEnv:
         # Add init script if it exists
         init_script_path = Path(self.config.init_script_path)
         if init_script_path.exists():
-            with open(init_script_path) as f:
+            with open(init_script_path, encoding="utf-8") as f:
                 await self.context.add_init_script(f.read())
         else:
             self.logger.warning(f"Init script not found: {init_script_path}")
@@ -1178,7 +1178,7 @@ class WebAgentEnv:
         #     self.logger.warning(f"Body element not found: {e}")
 
         if parser_script_path.exists():
-            with open(parser_script_path) as f:
+            with open(parser_script_path, encoding="utf-8") as f:
                 parser_code = f.read()
             try:
                 content = await self.page.evaluate(parser_code)

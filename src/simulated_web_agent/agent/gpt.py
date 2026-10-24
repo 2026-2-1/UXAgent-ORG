@@ -1,6 +1,9 @@
 import asyncio
 import json
+import math
+import os
 import time
+from functools import wraps
 from pathlib import Path
 from typing import Any, Dict, cast
 
@@ -22,12 +25,40 @@ from litellm.router import Router
 
 from . import context
 
-provider = "openai"  # "openai" or "aws" or "anthropic"
+load_dotenv()  # Load provider settings before constructing the routers.
+
+provider = os.getenv("LLM_PROVIDER", "openai")
+embedding_provider = os.getenv("EMBEDDING_PROVIDER") or None
+
+
+def configure(cfg):
+    """Apply chat and embedding settings at every application entry point."""
+    global provider, embedding_provider
+    provider = cfg.llm_provider
+    embedding_provider = cfg.get("embedding_provider", os.getenv("EMBEDDING_PROVIDER"))
+
+
+def _local_deployment():
+    # LiteLLM's OpenAI client appends /chat/completions to api_base.
+    base_url = os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+    if not base_url.endswith("/v1"):
+        base_url += "/v1"
+    return {
+        "model_name": "local",
+        "litellm_params": {
+            "model": "openai/" + os.getenv("LOCAL_LLM_MODEL", "persona-qwen"),
+            "api_base": base_url,
+            # The client requires a nonempty key even when this server has no auth.
+            # Never inherit OPENAI_API_KEY for the local endpoint.
+            "api_key": os.getenv("LOCAL_LLM_API_KEY") or "local-no-key",
+        },
+    }
 
 prompt_dir = Path(__file__).parent.absolute() / "shop_prompts"
 
 chat_router = Router(
     model_list=[
+        _local_deployment(),
         {
             "model_name": "openai",
             "litellm_params": {
@@ -48,6 +79,7 @@ chat_router = Router(
             "model_name": "anthropic",
             "litellm_params": {
                 "model": "claude-sonnet-4-20250514",
+                "custom_llm_provider": "anthropic",
             },
         },
         {
@@ -71,6 +103,7 @@ chat_router = Router(
             "model_name": "anthropic_thinking",
             "litellm_params": {
                 "model": "claude-sonnet-4-20250514",
+                "custom_llm_provider": "anthropic",
                 "thinking": {
                     "type": "enabled",
                     "budget_tokens": 32000,
@@ -82,6 +115,7 @@ chat_router = Router(
 
 slow_chat_router = Router(
     model_list=[
+        _local_deployment(),
         {
             "model_name": "openai",
             "litellm_params": {"model": "openai/gpt-5", "reasoning_effort": "minimal"},
@@ -99,6 +133,7 @@ slow_chat_router = Router(
             "model_name": "anthropic",
             "litellm_params": {
                 "model": "claude-sonnet-4-20250514",
+                "custom_llm_provider": "anthropic",
             },
         },
         {
@@ -119,6 +154,7 @@ slow_chat_router = Router(
             "model_name": "anthropic_thinking",
             "litellm_params": {
                 "model": "claude-sonnet-4-20250514",
+                "custom_llm_provider": "anthropic",
                 "thinking": {
                     "type": "enabled",
                     "budget_tokens": 32000,
@@ -128,8 +164,24 @@ slow_chat_router = Router(
     ]
 )
 
+def _local_embedding_deployment():
+    base_url = os.getenv("LOCAL_EMBEDDING_BASE_URL", "http://127.0.0.1:8100/v1").rstrip("/")
+    if not base_url.endswith("/v1"):
+        base_url += "/v1"
+    return {
+        "model_name": "local",
+        "litellm_params": {
+            "model": "openai/" + os.getenv("LOCAL_EMBEDDING_MODEL", "persona-qwen-embedding"),
+            "api_base": base_url,
+            "api_key": os.getenv("LOCAL_EMBEDDING_API_KEY") or "local-no-key",
+        },
+    }
+
+
+_local_embedding = _local_embedding_deployment()
 embed_router = Router(
     model_list=[
+        _local_embedding,
         {
             "model_name": "openai",
             "litellm_params": {"model": "openai/text-embedding-3-small"},
@@ -146,13 +198,17 @@ embed_router = Router(
 )
 
 
-load_dotenv()  # load anthropic api key from .env
 anthropic_client = anthropic.Anthropic()
 anthropic_model = "claude-sonnet-4-20250514"
 
 
+class ChatOutputTruncatedError(RuntimeError):
+    """A token-limited response cannot satisfy a complete JSON contract."""
+
+
 def async_retry(times=10):
     def func_wrapper(f):
+        @wraps(f)
         async def wrapper(*args, **kwargs):
             wait = 1
             max_wait = 5
@@ -161,6 +217,9 @@ def async_retry(times=10):
                 # noinspection PyBroadException
                 try:
                     return await f(*args, **kwargs)
+                except ChatOutputTruncatedError:
+                    # Repeating the same oversized request cannot fix the server's cap.
+                    raise
                 except Exception as exc:
                     last_exc = exc
                     print("got exc", exc)
@@ -231,7 +290,7 @@ async def async_chat(
     and change the provider global variable to your custom provider.
 
     Args:
-        model: "small" for lightweight version of the model
+        model: "small" or "large"; both use LOCAL_LLM_MODEL for provider "local"
         json_mode: whether the result should be in json deserializable
         log: whether to log the output
         max_tokens: the maximum number of tokens
@@ -246,11 +305,11 @@ async def async_chat(
 
     router = chat_router if model == "small" else slow_chat_router
     call_kwargs: Dict[str, Any] = dict(**kwargs)
-    if enable_thinking:
+    if enable_thinking and provider != "local":
         router_model = provider + "_thinking"
     else:
         router_model = provider
-    if json_mode and provider == "openai":
+    if json_mode and provider in {"openai", "local"}:
         call_kwargs["response_format"] = {"type": "json_object"}
     response = await router.acompletion(
         model=router_model,
@@ -261,8 +320,18 @@ async def async_chat(
         tools=None,
     )
     content = response.choices[0].message.get("content", "")
+    if not isinstance(content, str):
+        raise ValueError("Chat server returned non-text message content")
 
     finish_reason = response.choices[0].finish_reason
+    if json_mode and finish_reason == "length":
+        tokens = getattr(getattr(response, "usage", None), "completion_tokens", "unknown")
+        raise ChatOutputTruncatedError(
+            f"Chat JSON response was truncated: provider={provider}, "
+            f"finish_reason=length, requested max_tokens={max_tokens}, "
+            f"completion_tokens={tokens}. Check the model server's generation "
+            "limit/max_new_tokens. Partial JSON is not accepted."
+        )
     if finish_reason != "stop":
         print("finish_reason:", finish_reason)
         print("content:", content)
@@ -305,14 +374,14 @@ def chat(
 
     router = chat_router if model == "small" else slow_chat_router
     call_kwargs: Dict[str, Any] = dict(**kwargs)
-    if enable_thinking:
+    if enable_thinking and provider != "local":
         call_kwargs["thinking"] = {
             "type": "enabled",
             "budget_tokens": enable_thinking
             if isinstance(enable_thinking, int)
             else 1024,
         }
-    if json_mode and provider == "openai":
+    if json_mode and provider in {"openai", "local"}:
         call_kwargs["response_format"] = {"type": "json_object"}
 
     try:
@@ -330,19 +399,81 @@ def chat(
 
 
 async def embed_text(texts: list[str]) -> list[list[float]]:
-    """
-    Embed a list of texts using the provider configured in /src/simulated_web_agent/agent/gpt.py
+    """Return validated float vectors in input order, using only the embedding provider."""
+    if not isinstance(texts, list) or any(not isinstance(text, str) for text in texts):
+        raise TypeError("embed_text expects a list of strings")
+    if not texts:
+        return []
+    selected_provider = embedding_provider
+    if not selected_provider:
+        raise RuntimeError(
+            "No embedding provider configured. Set embedding_provider / "
+            "EMBEDDING_PROVIDER explicitly to local, openai or aws. "
+            "No chat-provider or paid-API fallback is performed."
+        )
+    if selected_provider not in {"local", "openai", "aws"}:
+        raise ValueError(
+            f"Unsupported embedding provider: {selected_provider!r}. "
+            "Available embedding routes: local, openai, aws."
+        )
 
-    Returns:
-        List of list[float] representing each of the embedded texts
-    """
+    call_kwargs = {}
+    expected_dimension = None
+    description = f"provider={selected_provider}"
+    if selected_provider == "local":
+        params = _local_embedding["litellm_params"]
+        description += f", base_url={params['api_base']}, model={params['model']}"
+        expected_dimension = int(os.getenv("LOCAL_EMBEDDING_DIMENSIONS", "1024"))
+        if expected_dimension <= 0:
+            raise ValueError("LOCAL_EMBEDDING_DIMENSIONS must be positive")
+        call_kwargs = {
+            "timeout": float(os.getenv("LOCAL_EMBEDDING_TIMEOUT", "60")),
+            "num_retries": 0,
+            # Prevent the OpenAI SDK's base64 default; server returns float arrays.
+            "encoding_format": "float",
+        }
     try:
-        response = await embed_router.aembedding(model=provider, input=texts)
-        return [e["embedding"] for e in response.data]
-    except Exception as e:
-        print(texts)
-        print(e)
-        raise e
+        response = await embed_router.aembedding(
+            model=selected_provider, input=texts, **call_kwargs
+        )
+    except Exception as exc:
+        hint = (
+            " Check the Windows SSH tunnel's final destination is DIS01, not ABRM02; "
+            "keep the UXAgent backend port 8081 separate."
+            if selected_provider == "local" else " Check this provider's credentials and service."
+        )
+        raise RuntimeError(
+            f"Embedding request failed ({description}): {type(exc).__name__}: {exc}.{hint}"
+        ) from exc
+
+    try:
+        data = response.data
+        if len(data) != len(texts):
+            raise ValueError(f"expected {len(texts)} vectors, received {len(data)}")
+        ordered = {}
+        for row in data:
+            index = row.get("index")
+            if type(index) is not int or not 0 <= index < len(texts) or index in ordered:
+                raise ValueError(f"missing, duplicate or invalid data[].index: {index!r}")
+            vector = row.get("embedding")
+            if not isinstance(vector, list) or not vector:
+                raise ValueError(f"embedding at index {index} must be a nonempty array")
+            if expected_dimension is None:
+                expected_dimension = len(vector)
+            if len(vector) != expected_dimension:
+                raise ValueError(
+                    f"embedding dimension mismatch at index {index}: "
+                    f"expected {expected_dimension}, received {len(vector)}"
+                )
+            if any(
+                isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) for value in vector
+            ):
+                raise ValueError(f"embedding at index {index} contains non-finite/non-numeric values")
+            ordered[index] = [float(value) for value in vector]
+        return [ordered[index] for index in range(len(texts))]
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid embedding response ({description}): {exc}") from exc
 
 
 def chat_anthropic_computer_use(

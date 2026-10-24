@@ -1,4 +1,6 @@
 # app.py
+import os
+
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import BadRequest
 
@@ -126,4 +128,10 @@ def progress_endpoint():
 
 if __name__ == "__main__":
     # Minimal dev server
-    app.run(host="0.0.0.0", port=8000, debug=True, use_reloader=False, threaded=True)
+    app.run(
+        host="127.0.0.1",
+        port=int(os.getenv("UXAGENT_API_PORT", "8081")),
+        debug=True,
+        use_reloader=False,
+        threaded=True,
+    )

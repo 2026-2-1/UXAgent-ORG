@@ -163,7 +163,7 @@ async def generate_personas(
     # base example, default to the one in config if not provided
     cfg = _load_cfg()
     base_example = cfg.example_persona
-    gpt.provider = cfg.llm_provider
+    gpt.configure(cfg)
 
     if example_text and example_text != "":
         logger.info("Using custom persona example: " + example_text[:100] + "...")

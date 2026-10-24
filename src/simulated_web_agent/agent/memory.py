@@ -15,6 +15,27 @@ MEMORY_IMPORTANCE_PROMPT = load_prompt("memory_importance")
 logger = logging.getLogger(__name__)
 
 
+def _embedding_matrix(vectors, rows, dimension=None, operation="memory"):
+    try:
+        matrix = np.asarray(vectors, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{operation}: embeddings must be a rectangular numeric matrix") from exc
+    if matrix.ndim != 2 or matrix.shape[0] != rows or matrix.shape[1] == 0:
+        raise ValueError(
+            f"{operation}: expected {rows} embedding rows with a positive dimension; "
+            f"received shape {matrix.shape}"
+        )
+    if dimension is not None and matrix.shape[1] != dimension:
+        raise ValueError(
+            f"{operation}: embedding dimension mismatch: stored={dimension}, "
+            f"received={matrix.shape[1]}. Use the same embedding model/dimensions "
+            "for memory and queries, or re-embed existing memories."
+        )
+    if not np.isfinite(matrix).all():
+        raise ValueError(f"{operation}: embeddings contain NaN or infinity")
+    return matrix
+
+
 class Memory:
     memories: list["MemoryPiece"] = []
     embeddings: np.ndarray
@@ -76,9 +97,15 @@ class Memory:
                     return np.array([]), 0
                 inputs = [m.content for m in memory_to_embed]
                 embeds = await embed_text(inputs)
-                embeds = np.array(embeds)
-                for i, m in enumerate(memory_to_embed):
-                    m.embedding = embeds[i]
+                dimension = None
+                if self.embeddings.size:
+                    stored = _embedding_matrix(
+                        self.embeddings, len(self.embeddings), operation="memory.update stored vectors"
+                    )
+                    dimension = stored.shape[1]
+                embeds = _embedding_matrix(
+                    embeds, len(memory_to_embed), dimension, "memory.update"
+                )
                 return embeds, len(memory_to_embed)
 
             async def update_importance():
@@ -115,8 +142,6 @@ class Memory:
                 )
                 new_importance = [json.loads(r)["score"] for r in responses]
                 new_importance = np.array(new_importance) / 10
-                for i, m in enumerate(memory_to_update):
-                    m.importance = new_importance[i]
                 return new_importance, len(memory_to_update)
 
             (embeds, n_embeds), (new_importance, n_imps) = await asyncio.gather(
@@ -124,6 +149,13 @@ class Memory:
             )
 
             async with self.read_lock:
+                # Commit per-piece values only after both API operations succeed.
+                embedding_start = len(self.embeddings)
+                importance_start = len(self.importance)
+                for i in range(n_embeds):
+                    self.memories[embedding_start + i].embedding = embeds[i]
+                for i in range(n_imps):
+                    self.memories[importance_start + i].importance = new_importance[i]
                 # merge embeddings
                 if self.embeddings.size == 0:
                     self.embeddings = embeds
@@ -202,8 +234,13 @@ class Memory:
                     context.api_call_manager.get().retrieve_result.append(results)
                 return results
 
-            query_embedding = (await embed_text([query]))[0]
-            similarities = np.dot(self.embeddings, query_embedding)
+            stored = _embedding_matrix(
+                self.embeddings, len(self.embeddings), operation="memory.retrieve stored vectors"
+            )
+            query_embedding = _embedding_matrix(
+                await embed_text([query]), 1, stored.shape[1], "memory.retrieve"
+            )[0]
+            similarities = np.dot(stored, query_embedding)
             recencies = np.array([m.timestamp - self.timestamp for m in self.memories])
             recencies = np.exp(recencies)
             kind_weights = np.array([kind_weight.get(m.kind, 1) for m in self.memories])
