@@ -202,7 +202,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, computed, ref } from "vue";
+import { inject, ref } from "vue";
 import { FORM_KEY, NAV_KEY, type WizardForm, type WizardNav } from "../types";
 import { MdArrowRoundForward, MdTrash, MdAdd } from "@vicons/ionicons4";
 import { getWizardDefaults } from "../composables/useForm";
@@ -214,19 +214,6 @@ const formRef = ref<FormInst | null>(null);
 
 // For number input, allow temporary null/empty while editing; apply on blur
 const pendingByChoiceId = new Map<string, number | null>();
-
-function urlValidator(_: any, value: string) {
-  if (!value) return new Error("Please enter a URL");
-  try {
-    // Allow missing protocol by attempting to prepend https:// for check
-    const hasProtocol = /^(https?:)\/\//i.test(value);
-    // eslint-disable-next-line no-new
-    new URL(hasProtocol ? value : `https://${value}`);
-    return true;
-  } catch {
-    return new Error("Please enter a valid URL");
-  }
-}
 
 function selectAll(e: FocusEvent) {
   const target = e.target as HTMLInputElement | null;
@@ -240,27 +227,6 @@ function selectAll(e: FocusEvent) {
 }
 
 /* ---------------------- Submit ---------------------- */
-const isValidMeta = computed(() => {
-  const hasValidUrl = (() => {
-    const url = form.experiment.startUrl;
-    if (!url) return false;
-    try {
-      const hasProtocol = /^(https?:)\/\//i.test(url);
-      new URL(hasProtocol ? url : `https://${url}`);
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-
-  return (
-    hasValidUrl &&
-    Number.isFinite(form.persona!.numSubjects) &&
-    (form.persona!.numSubjects as number) >= 1 &&
-    String(form.persona!.generalIntent || "").trim().length > 0
-  );
-});
-
 function handleReset() {
   try {
     localStorage.removeItem("wizard_form");

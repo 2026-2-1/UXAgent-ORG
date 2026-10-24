@@ -127,18 +127,15 @@
 
 <script setup lang="ts">
 import { inject, computed, ref, h } from "vue";
-import { useMessage, NProgress, useDialog } from "naive-ui";
+import { NProgress, useDialog } from "naive-ui";
 import { FORM_KEY, NAV_KEY, type WizardForm, type WizardNav } from "../types";
 import { MdArrowRoundBack } from "@vicons/ionicons4";
-import { buildRunPayload } from "../composables/useForm";
 import { getPercentsFromWeights } from "../utils/weights.ts";
 
 const form = inject<WizardForm>(FORM_KEY);
 const nav = inject<WizardNav>(NAV_KEY);
-const message = useMessage();
 const dialog = useDialog();
 
-const apiPayload = computed(() => buildRunPayload(form!));
 
 type DistRow = { group: string; weight: number };
 /** Turn an array of {name, probability} into rows (probability already 0..1) */
@@ -188,16 +185,6 @@ const questionnaireObject = computed(() => {
   }
 });
 
-const questionnaireParseError = computed(() => {
-  const txt = form?.survey?.questionnaire ?? "";
-  if (!txt?.trim()) return "Questionnaire is empty";
-  try {
-    JSON.parse(txt);
-    return "";
-  } catch (e: any) {
-    return String(e?.message ?? e);
-  }
-});
 
 type QItem = {
   idx: number;
@@ -235,19 +222,18 @@ const submitting = ref(false);
 async function submit() {
   submitting.value = true;
   try {
-    nav?.finish?.();
+    await nav?.finish?.();
+    dialog.success({
+      title: "Study Successfully Created!",
+      content: "Study is running. Follow each persona in the progress window.",
+    });
   } catch (e: any) {
     console.error(e);
-    dialog.error(`Submit failed: ${e?.message ?? e}`);
+    dialog.error({ title: "실행 실패", content: String(e?.message ?? e) });
   } finally {
     submitting.value = false;
   }
 
-  dialog.success({
-    title: "Study Successfully Created!",
-    content:
-      "Study is now running in the background.",
-  });
 }
 </script>
 

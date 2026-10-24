@@ -152,6 +152,7 @@ async def generate_personas(
     rng_seed: int | None = None,
     on_progress: Optional[Callable[[int, int], None]] = None,
     example_text: Optional[str] = None,
+    on_participant: Optional[Callable[[dict], None]] = None,
 ) -> list[dict[str, str]]:
     """
     Concurrent persona generation using asyncio and async_chat.
@@ -201,6 +202,8 @@ async def generate_personas(
     for fut in asyncio.as_completed(tasks):
         idx, res = await fut
         results[idx] = res
+        if on_participant:
+            on_participant({"participant_id": idx, "status": "queued", "persona": res["persona"], "intent": res["intent"]})
         done += 1
         if on_progress:
             try:

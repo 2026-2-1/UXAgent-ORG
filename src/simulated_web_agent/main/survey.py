@@ -18,6 +18,7 @@ async def run_survey(
     *,
     concurrency: int = 4,
     on_progress: Optional[Callable[[int, int], None]] = None,
+    on_participant: Optional[Callable[[dict], None]] = None,
 ) -> None:
     """
     Run the survey for all memory traces found under:
@@ -71,26 +72,35 @@ async def run_survey(
     # ---------- Answer concurrently with a semaphore ----------
     sem = asyncio.Semaphore(concurrency)
 
-    async def _one(trace_dir: Path):
+    async def _one(index: int, trace_dir: Path):
         nonlocal done
-        async with sem:
-            res = await _generate_response_dict(trace_dir)
-            # Write per-file output
-            (trace_dir / "survey_result.json").write_text(
-                json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
+        def update(**fields):
+            if on_participant:
+                on_participant({"participant_id": index, **fields})
 
-        async with lock:
-            done += 1
-            if on_progress:
-                try:
+        try:
+            if isinstance(trace_dir, Exception) or (trace_dir / "error.txt").exists():
+                update(status="error", message="Browser task failed; survey skipped")
+                return
+            async with sem:
+                update(status="surveying", message="Filling questionnaire")
+                res = await _generate_response_dict(trace_dir)
+                (trace_dir / "survey_result.json").write_text(
+                    json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                update(status="completed", message="Survey completed")
+        except Exception as exc:
+            update(status="error", error=str(exc), message="Survey failed")
+            raise
+        finally:
+            async with lock:
+                done += 1
+                if on_progress:
                     on_progress(done, total)
-                except Exception:
-                    pass
 
         return res
 
-    tasks = [_one(trace_dir) for trace_dir in trace_dirs]
+    tasks = [_one(index, trace_dir) for index, trace_dir in enumerate(trace_dirs)]
     results: list[dict[str, Any]] = []
     if tasks:
         for fut in asyncio.as_completed(tasks):

@@ -41,7 +41,7 @@ export interface WizardNav {
   steps: number
   next: () => void
   prev: () => void
-  finish: () => void
+  finish: () => Promise<void>
 }
 
 export const FORM_KEY: InjectionKey<WizardForm> = Symbol('WizardForm')

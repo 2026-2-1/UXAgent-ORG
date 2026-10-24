@@ -69,7 +69,7 @@
               ><span style="color: rgb(208, 48, 80)">&nbsp;*</span></label
             >
             <n-form-item
-              v-for="(opt, option_index) in q.options"
+              v-for="(_opt, option_index) in q.options"
               :key="option_index"
               :path="`questions[${i}].options[${option_index}]`"
               :rule="{
@@ -84,7 +84,7 @@
                 v-model:value="q.options[option_index]"
                 placeholder="Add option, press Enter to add more"
                 @keydown.enter="addOption(i, option_index)"
-                :ref="(el) => (questionRefs[`${i}-${option_index}`] = el)"
+                :ref="(el: any) => (questionRefs[`${i}-${option_index}`] = el)"
               >
                 <template #suffix>
                   <n-button text circle @click="addOption(i, option_index)">
@@ -316,24 +316,6 @@ const builtSurvey = computed(() => {
 
 const previewJson = computed(() => JSON.stringify(builtSurvey.value, null, 2));
 
-const isValid = computed(() => {
-  if (!builtSurvey.value.questionnaire_id) return false;
-  if (!builtSurvey.value.title) return false;
-  if (
-    !Array.isArray(builtSurvey.value.questions) ||
-    builtSurvey.value.questions.length === 0
-  )
-    return false;
-  for (const q of builtSurvey.value.questions) {
-    if (!q.prompt) return false;
-    if (q.type === "multiple_choice") {
-      if (!Array.isArray((q as any).options) || (q as any).options.length < 1)
-        return false;
-    }
-  }
-  return true;
-});
-
 // ---------- Submit ----------
 function handleNext() {
   formRef.value?.validate().then(() => {
@@ -344,13 +326,16 @@ function handleNext() {
 }
 
 async function addOption(index: number, option_index: number) {
-  questionsForm.value.questions[index].options.splice(option_index + 1, 0, "");
+  const question = questionsForm.value.questions[index];
+  if (question.type !== "multiple_choice") return;
+  question.options.splice(option_index + 1, 0, "");
   // focus on the new input
   await nextTick();
   questionRefs.value[`${index}-${option_index + 1}`]?.focus();
 }
 async function removeOption(index: number, option_index: number) {
-  questionsForm.value.questions[index].options.splice(option_index, 1);
+  const question = questionsForm.value.questions[index];
+  if (question.type === "multiple_choice") question.options.splice(option_index, 1);
 }
 </script>
 

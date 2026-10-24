@@ -54,6 +54,7 @@ async def run_async(
             {"phase": "personas", "status": "progress", "current": k, "total": n}
         ),
         example_text=example_persona,
+        on_participant=ping,
     )
     # generation ends here
     ping(
@@ -80,6 +81,7 @@ async def run_async(
         config_path=".",
         concurrency=concurrency,  # add more if safe. so far 4 works. can't garentee this wont explode your pc if = 1000
         headless=headless,
+        on_participant=ping,
         on_progress=lambda k, n: ping(
             {"phase": "agents", "status": "progress", "current": k, "total": n}
         ),
@@ -98,6 +100,7 @@ async def run_async(
     await run_survey(
         trace_dirs=trace_dirs,
         questionnaire=questionnaire,
+        on_participant=ping,
         on_progress=lambda k, n: ping(
             {"phase": "surveys", "status": "progress", "current": k, "total": n}
         ),

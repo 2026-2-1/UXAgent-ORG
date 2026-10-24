@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted } from 'vue'
+import { computed, watch, onMounted } from 'vue'
 import { ref, onUpdated, nextTick } from 'vue'
 import { NProgress } from 'naive-ui'
 import { useProgress } from '../composables/useProgress'
@@ -83,15 +83,12 @@ const ariaText = computed(() =>
   isIdle.value ? (snap.value.message || 'Waiting…') : `${snap.value.label}: ${snap.value.current} of ${snap.value.total}`
 )
 
-// auto-hide shortly after 100%
-let hideTimer: number | null = null
-watch(percent, (p) => {
-  if (p === 100 && !isIdle.value) {
-    if (hideTimer) clearTimeout(hideTimer)
-    hideTimer = window.setTimeout(() => emit('done'), 1200)
+watch(() => data.value.status, status => {
+  if (['completed', 'completed_with_errors', 'error'].includes(status)) {
+    stop()
+    emit('done')
   }
 })
-onUnmounted(() => hideTimer && clearTimeout(hideTimer))
 </script>
 
 <style scoped>

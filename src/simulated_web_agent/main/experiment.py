@@ -28,7 +28,13 @@ async def _run_for_persona_and_intent(
     wait_for_login: bool = False,
     env_setup_hook: Callable = None,
     env_wait_hook: Callable = None,
+    on_update: Optional[Callable[[dict], None]] = None,
 ):
+    def update(**fields):
+        if on_update:
+            on_update(fields)
+
+    update(status="running", message="Preparing browser")
     persona = persona_info["persona"]
     intent = persona_info["intent"]
     log.info(
@@ -132,6 +138,7 @@ async def _run_for_persona_and_intent(
         obs = await env.observation()
 
         log.info("Initial observation ready")
+        update(message="Choosing next action", url=env.page.url)
 
         action_trace = []
         while steps_taken < max_steps:
@@ -151,6 +158,7 @@ async def _run_for_persona_and_intent(
 
             # Use our policy to determine the action for this step from the environment
             action = await policy.forward(env)
+            update(message="Executing action", action=json.dumps(action, ensure_ascii=False, default=str))
             action_trace.append(action)
             with open(trace_dir / "action_trace.json", "w", encoding="utf-8") as f:
                 json.dump(action_trace, f, indent=2)
@@ -169,6 +177,7 @@ async def _run_for_persona_and_intent(
             print(f"Action: {steps_taken + 1} out of {max_steps}")
             obs = await env.step(action)
             steps_taken += 1
+            update(steps=steps_taken, url=env.page.url, message="Choosing next action")
 
             if obs.get("terminated"):
                 break
@@ -185,9 +194,11 @@ async def _run_for_persona_and_intent(
         trace_file.write_text(final_memories_str, encoding="utf-8")
 
         log.info(f"Saved memory trace to {trace_file}")
+        update(status="awaiting_survey", message="Browser task finished; waiting for survey")
 
     except Exception:
         err = traceback.format_exc()
+        update(status="error", error=err.splitlines()[-1], message="Browser task failed")
         print(err)
         try:
             (trace_dir / "error.txt").write_text(err, encoding="utf-8")
@@ -199,6 +210,7 @@ async def _run_for_persona_and_intent(
                 await policy.close()
             except Exception:
                 log.exception(f"[{run_uid}] agent background task failed during shutdown")
+                update(status="error", error="Agent shutdown failed")
                 (trace_dir / "error.txt").write_text(traceback.format_exc(), encoding="utf-8")
         try:
             log.info(f"[{run_uid}] closing env...")
@@ -225,6 +237,7 @@ async def experiment_async(
     config_path: str = ".",
     concurrency: int = 4,
     on_progress: Optional[Callable[[int, int], None]] = None,
+    on_participant: Optional[Callable[[dict], None]] = None,
 ) -> None:
     cfg = _load_cfg(config_name=config_name)
     if concurrency:
@@ -238,7 +251,7 @@ async def experiment_async(
     done = 0
     lock = asyncio.Lock()  # protect shared counter in async context
 
-    async def run_one(entry: Dict[str, str]):
+    async def run_one(index: int, entry: Dict[str, str]):
         nonlocal done
         # persona = (entry.get("persona") or "").strip()
         # intent = (entry.get("intent") or "").strip()
@@ -251,6 +264,7 @@ async def experiment_async(
                 persona_info=entry,
                 start_url=start_url,
                 max_steps=max_steps,
+                on_update=lambda fields: on_participant({"participant_id": index, **fields}) if on_participant else None,
             )
 
         # --- progress tick ---
@@ -263,10 +277,12 @@ async def experiment_async(
                     pass
         return trace_dir
 
-    tasks = [asyncio.create_task(run_one(e)) for e in agents]
+    tasks = [asyncio.create_task(run_one(i, e)) for i, e in enumerate(agents)]
     # This await is the "barrier": it doesn't return until ALL experiments finish
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    for r in results:
+    for index, r in enumerate(results):
         if isinstance(r, Exception):
             log.exception("A session failed", exc_info=r)
+            if on_participant:
+                on_participant({"participant_id": index, "status": "error", "error": str(r)})
     return results

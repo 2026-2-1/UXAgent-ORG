@@ -2,11 +2,17 @@
   <n-config-provider>
     <n-dialog-provider>
       <n-message-provider>
+        <RunProgress v-if="isMonitor" />
+        <template v-else>
         <TopProgressBar
         :active="progressActive"
         @done="progressActive = false"
         @height="barHeight = $event"
         />
+        <div v-if="monitorUrl" class="monitor-link">
+          <a :href="monitorUrl" target="_blank" rel="noopener">페르소나별 진행 상황 열기 ↗</a>
+          <span v-if="popupBlocked"> 새 창이 차단되었습니다. 링크를 눌러 열어주세요.</span>
+        </div>
         <n-layout
           class="min-h-screen"
           :style="{ paddingTop: `${barHeight}px` }"
@@ -40,6 +46,7 @@
             </div>
           </n-layout-content>
         </n-layout>
+        </template>
       </n-message-provider>
     </n-dialog-provider>
   </n-config-provider>
@@ -51,6 +58,7 @@ import type { StepsProps } from "naive-ui";
 import { FORM_KEY, NAV_KEY, type WizardNav } from "./types";
 import { createWizardForm, submitWizardForm } from "./composables/useForm";
 import TopProgressBar from "./components/topProgressBar.vue";
+import RunProgress from "./components/RunProgress.vue";
 import { useRouteQuery } from "@vueuse/router";
 
 // ---- steps ----
@@ -72,6 +80,10 @@ const current = useRouteQuery("step", 1, { transform: Number });
 const currentStatus = ref<StepsProps["status"]>("process");
 
 const progressActive = ref(false);
+const isMonitor = new URLSearchParams(window.location.search).get("view") === "progress";
+const monitorUrl = ref("");
+const popupBlocked = ref(false);
+let starting = false;
 
 const next = () => {
   if (current.value < steps) current.value++;
@@ -80,14 +92,28 @@ const prev = () => {
   if (current.value > 1) current.value--;
 };
 const finish = async () => {
+  if (starting) return;
+  starting = true;
+  // Open synchronously during the click so browsers allow the new window.
+  const monitor = window.open("about:blank", "_blank", "popup,width=1200,height=850");
+  if (monitor) {
+    monitor.opener = null;
+    monitor.document.title = "진행 상황 준비 중";
+    monitor.document.body.textContent = "실행을 시작하고 있습니다…";
+  }
+  popupBlocked.value = !monitor;
   try {
-    console.log("Top bar activated"); // should fire on click
-    progressActive.value = true; // show top bar
-    await submitWizardForm(form); // triggers POST /run
-    // optionally keep the bar up until @done fires (auto-hide on 100%)
-  } catch (e: any) {
-    progressActive.value = false; // hide if submit failed
-    window.alert(e?.message ?? "Submit failed");
+    const result = await submitWizardForm(form);
+    const url = new URL(window.location.href);
+    url.search = new URLSearchParams({ view: "progress", run_id: result.run_id }).toString();
+    monitorUrl.value = url.toString();
+    if (monitor && !monitor.closed) monitor.location.replace(monitorUrl.value);
+    progressActive.value = true;
+  } catch (e) {
+    monitor?.close();
+    throw e;
+  } finally {
+    starting = false;
   }
 };
 
@@ -98,6 +124,7 @@ const stepComponents = [personas, survey, reviewSubmit];
 </script>
 
 <style scoped>
+.monitor-link { padding: 12px 24px; background: #edf8f3; }
 .container {
   max-width: 960px;
   margin: 0 auto;
